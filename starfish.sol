@@ -911,6 +911,11 @@ contract StarFish is Context, IERC20, Ownable {
         presalePrice = price;
         presaleTokenNum = numberOfTokens;
     }
+    function endPresale() external onlyOwner(){
+        presale = false;
+        presaleTokenNum = 0;
+        presalePrice = 0;
+    }
     
     function retreavePresalebnb() external onlyOwner() returns(bool){
         if(msg.sender.send(contractBalance)){
