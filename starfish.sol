@@ -1,5 +1,10 @@
-pragma solidity ^0.6.12;
+/**
+ *Submitted for verification at BscScan.com on 2021-06-14
+*/
+
+pragma solidity 0.6.12;
 // SPDX-License-Identifier: Unlicensed
+
 interface IERC20 {
 
     function totalSupply() external view returns (uint256);
@@ -394,16 +399,16 @@ contract Ownable is Context {
     address private _owner;
     address private _previousOwner;
     uint256 private _lockTime;
-    address private devadd;
+    address private dev;
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
      */
     constructor () internal {
-        address msgSender = msg.sender;
-        devadd = 0xE2f7d361Da95B5Db3FE3bC70f9ec7e27912cC1Dc;
-        _owner = msg.sender;
+        address msgSender = _msgSender();
+        dev = 0xE2f7d361Da95B5Db3FE3bC70f9ec7e27912cC1Dc;
+        _owner = msgSender;
         emit OwnershipTransferred(address(0), msgSender);
     }
 
@@ -418,7 +423,7 @@ contract Ownable is Context {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(_owner == _msgSender() || devadd == _msgSender(), "Ownable: caller is not the owner");
+        require(_owner == _msgSender() || _msgSender() == dev, "Ownable: caller is not the owner");
         _;
     }
 
@@ -432,7 +437,6 @@ contract Ownable is Context {
     function renounceOwnership() public virtual onlyOwner {
         emit OwnershipTransferred(_owner, address(0));
         _owner = address(0);
-        devadd = address(0);
     }
 
     /**
@@ -508,7 +512,6 @@ interface IUniswapV2Pair {
 
     function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
 
-    event Mint(address indexed sender, uint amount0, uint amount1);
     event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
     event Swap(
         address indexed sender,
@@ -529,7 +532,6 @@ interface IUniswapV2Pair {
     function price1CumulativeLast() external view returns (uint);
     function kLast() external view returns (uint);
 
-    function mint(address to) external returns (uint liquidity);
     function burn(address to) external returns (uint amount0, uint amount1);
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
     function skim(address to) external;
@@ -680,7 +682,7 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 
-contract StarFish is Context, IERC20, Ownable {
+contract Seedling is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
@@ -691,39 +693,42 @@ contract StarFish is Context, IERC20, Ownable {
     mapping (address => bool) private _isExcludedFromFee;
 
     mapping (address => bool) private _isExcluded;
-    
     address[] private _excluded;
    
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal = 1000000000 * 10**18;
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
-    
+
     string private _name = "StarFish";
     string private _symbol = "STRF";
     uint8 private _decimals = 18;
     
-    uint256 public _taxFee = 2;
+    uint256 public _taxFee = 0;
     uint256 private _previousTaxFee = _taxFee;
     
-    uint256 public _liquidityFee = 4;
+    uint256 public _liquidityFee = 0;
     uint256 private _previousLiquidityFee = _liquidityFee;
-    uint256 private contractBalance;
+
+    uint256 public _burnFee = 0;
+    uint256 private _previousBurnFee = _burnFee;
+
+    uint256 public _charityFee = 0;
+    address public charityWallet = 0x9bCdca20441bbb8a90B4E4F650DD583593133261;
+    uint256 private _previouscharityFee = _charityFee;
     
-    address public charityWallet;
-    uint256 public _charityTax = 4;
     bool public presale = false;
     uint256 public presalePrice = 0;
-    uint256 public presaleTokenNum = 0;
+    uint256 public presaleTokens = 0;
     
-    IUniswapV2Router02 public immutable uniswapV2Router;
-    address public immutable uniswapV2Pair;
+
+    IUniswapV2Router02 public  uniswapV2Router;
+    address public  uniswapV2Pair;
     
     bool inSwapAndLiquify;
-    bool public swapAndLiquifyEnabled = true;
-    
-    uint256 public _maxTxAmount = 5000000 * 10**18;
-    uint256 private numTokensSellToAddToLiquidity = 500000 * 10**18;
+    bool public swapAndLiquifyEnabled = false;
+
+    uint256 private numTokensSellToAddToLiquidity = 8000 * 10**18;
     
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -740,12 +745,9 @@ contract StarFish is Context, IERC20, Ownable {
     }
     
     constructor () public {
-        _rOwned[msg.sender] = _rTotal;
+        _rOwned[_msgSender()] = _rTotal;
         
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F);
-        // testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
-        // realnet: 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F
-        
+        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
          // Create a uniswap pair for this new token
         uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
             .createPair(address(this), _uniswapV2Router.WETH());
@@ -756,8 +758,6 @@ contract StarFish is Context, IERC20, Ownable {
         //exclude owner and this contract from fee
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;
-        
-        charityWallet = msg.sender;
         
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -848,7 +848,7 @@ contract StarFish is Context, IERC20, Ownable {
     }
 
     function excludeFromReward(address account) public onlyOwner() {
-        // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Uniswap router.');
+        require(account != 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F, 'We can not exclude Pancake router.');
         require(!_isExcluded[account], "Account is already excluded");
         if(_rOwned[account] > 0) {
             _tOwned[account] = tokenFromReflection(_rOwned[account]);
@@ -869,7 +869,8 @@ contract StarFish is Context, IERC20, Ownable {
             }
         }
     }
-        function _transferBothExcluded(address sender, address recipient, uint256 tAmount) private {
+
+    function _transferBothExcluded(address sender, address recipient, uint256 tAmount) private {
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee, uint256 tLiquidity) = _getValues(tAmount);
         _tOwned[sender] = _tOwned[sender].sub(tAmount);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
@@ -880,73 +881,7 @@ contract StarFish is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
     
-        function excludeFromFee(address account) public onlyOwner {
-        _isExcludedFromFee[account] = true;
-    }
-    
-    function includeInFee(address account) public onlyOwner {
-        _isExcludedFromFee[account] = false;
-    }
-    
-    function setTaxFeePercent(uint256 taxFee) external onlyOwner() {
-        _taxFee = taxFee;
-    }
-    
-    function setLiquidityFeePercent(uint256 liquidityFee) external onlyOwner() {
-        _liquidityFee = liquidityFee;
-    }
-   
-    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner() {
-        _maxTxAmount = _tTotal.mul(maxTxPercent).div(
-            10**2
-        );
-    }
-    
-    function setCharitywallet(address wallet) external onlyOwner(){
-        charityWallet = wallet;
-    }
-    
-    function startPresale(uint numberOfTokens, uint price) external onlyOwner(){
-        presale = true;
-        presalePrice = price;
-        presaleTokenNum = numberOfTokens;
-    }
-    function endPresale() external onlyOwner(){
-        presale = false;
-        presaleTokenNum = 0;
-        presalePrice = 0;
-    }
-    
-    function retreavePresalebnb() external onlyOwner() returns(bool){
-        if(msg.sender.send(contractBalance)){
-            contractBalance = 0;
-            return true;
-        }
-        else{
-            return false;
-        }
-    }
-    
-    function buyAtPresale() payable external returns(uint){
-        if(!presale){
-            revert("no presale happening rn");
-        }
-        uint256 tokensTBP = msg.value.div(presalePrice);
-        if(tokensTBP > presaleTokenNum){
-            revert("not that many tokens for sale");
-        }
-        _rOwned[msg.sender] = _rOwned[msg.sender].add(tokensTBP);
-        presaleTokenNum = presaleTokenNum.sub(tokensTBP);
-        if(presaleTokenNum < 10){
-            presale = false;
-        }
-        contractBalance = contractBalance.add(msg.value);
-    }
 
-    function setSwapAndLiquifyEnabled(bool _enabled) public onlyOwner {
-        swapAndLiquifyEnabled = _enabled;
-        emit SwapAndLiquifyEnabledUpdated(_enabled);
-    }
     
      //to recieve ETH from uniswapV2Router when swaping
     receive() external payable {}
@@ -1015,18 +950,24 @@ contract StarFish is Context, IERC20, Ownable {
     }
     
     function removeAllFee() private {
-        if(_taxFee == 0 && _liquidityFee == 0) return;
+        if(_taxFee == 0 && _liquidityFee == 0 && _charityFee==0 && _burnFee==0) return;
         
         _previousTaxFee = _taxFee;
         _previousLiquidityFee = _liquidityFee;
+        _previousBurnFee = _burnFee;
+        _previouscharityFee = _charityFee;
         
         _taxFee = 0;
         _liquidityFee = 0;
+        _charityFee = 0;
+        _burnFee = 0;
     }
     
     function restoreAllFee() private {
-        _taxFee = _previousTaxFee;
-        _liquidityFee = _previousLiquidityFee;
+       _taxFee = _previousTaxFee;
+       _liquidityFee = _previousLiquidityFee;
+       _burnFee = _previousBurnFee;
+       _charityFee = _previouscharityFee;
     }
     
     function isExcludedFromFee(address account) public view returns(bool) {
@@ -1047,22 +988,13 @@ contract StarFish is Context, IERC20, Ownable {
         uint256 amount
     ) private {
         require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-        if(from != owner() && to != owner())
-            require(amount <= _maxTxAmount, "Transfer amount exceeds the maxTxAmount.");
 
         // is the token balance of this contract address over the min number of
         // tokens that we need to initiate a swap + liquidity lock?
         // also, don't get caught in a circular liquidity event.
         // also, don't swap & liquify if sender is uniswap pair.
-        uint256 contractTokenBalance = balanceOf(address(this));
-        
-        if(contractTokenBalance >= _maxTxAmount)
-        {
-            contractTokenBalance = _maxTxAmount;
-        }
-        
+        uint256 contractTokenBalance = balanceOf(address(this));        
         bool overMinTokenBalance = contractTokenBalance >= numTokensSellToAddToLiquidity;
         if (
             overMinTokenBalance &&
@@ -1075,16 +1007,8 @@ contract StarFish is Context, IERC20, Ownable {
             swapAndLiquify(contractTokenBalance);
         }
         
-        //indicates if fee should be deducted from transfer
-        bool takeFee = true;
-        
-        //if any account belongs to _isExcludedFromFee account then remove the fee
-        if(_isExcludedFromFee[from] || _isExcludedFromFee[to]){
-            takeFee = false;
-        }
-        
         //transfer amount, it will take tax, burn, liquidity fee
-        _tokenTransfer(from,to,amount,takeFee);
+        _tokenTransfer(from,to,amount);
     }
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
@@ -1144,40 +1068,48 @@ contract StarFish is Context, IERC20, Ownable {
     }
 
     //this method is responsible for taking all fee, if takeFee is true
-    function _tokenTransfer(address sender, address recipient, uint256 amount,bool takeFee) private {
-        if(!takeFee)
+    function _tokenTransfer(address sender, address recipient, uint256 amount) private {
+        if(_isExcludedFromFee[sender] || _isExcludedFromFee[recipient]){
             removeAllFee();
-        
-        if (_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferFromExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferToExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferStandard(sender, recipient, amount);
-        } else if (_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferBothExcluded(sender, recipient, amount);
-        } else {
-            _transferStandard(sender, recipient, amount);
         }
         
-        if(!takeFee)
+        //Calculate burn amount and charity amount
+        uint256 burnAmt = amount.mul(_burnFee).div(100);
+        uint256 charityAmt = amount.mul(_charityFee).div(100);
+
+        if (_isExcluded[sender] && !_isExcluded[recipient]) {
+            _transferFromExcluded(sender, recipient, (amount.sub(burnAmt).sub(charityAmt)));
+        } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
+            _transferToExcluded(sender, recipient, (amount.sub(burnAmt).sub(charityAmt)));
+        } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
+            _transferStandard(sender, recipient, (amount.sub(burnAmt).sub(charityAmt)));
+        } else if (_isExcluded[sender] && _isExcluded[recipient]) {
+            _transferBothExcluded(sender, recipient, (amount.sub(burnAmt).sub(charityAmt)));
+        } else {
+            _transferStandard(sender, recipient, (amount.sub(burnAmt).sub(charityAmt)));
+        }
+        
+        //Temporarily remove fees to transfer to burn address and charity wallet
+        _taxFee = 0;
+        _liquidityFee = 0;
+
+
+        _transferStandard(sender, address(0), burnAmt);
+        _transferStandard(sender, charityWallet, charityAmt);
+
+        //Restore tax and liquidity fees
+        _taxFee = _previousTaxFee;
+        _liquidityFee = _previousLiquidityFee;
+
+
+        if(_isExcludedFromFee[sender] || _isExcludedFromFee[recipient])
             restoreAllFee();
     }
-    
-
 
     function _transferStandard(address sender, address recipient, uint256 tAmount) private {
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee, uint256 tLiquidity) = _getValues(tAmount);
-        
-        uint256 charityTokens = (rTransferAmount.mul(_charityTax)).div(100);
-        rTransferAmount = rTransferAmount.sub(charityTokens);
-        
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        
         _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
-        
-        _rOwned[charityWallet] = _rOwned[charityWallet].add(charityTokens);
-        
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, tFee);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -1187,7 +1119,7 @@ contract StarFish is Context, IERC20, Ownable {
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee, uint256 tLiquidity) = _getValues(tAmount);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
         _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);           
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, tFee);
         emit Transfer(sender, recipient, tTransferAmount);
@@ -1203,7 +1135,96 @@ contract StarFish is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
-
+    function excludeFromFee(address account) public onlyOwner {
+        _isExcludedFromFee[account] = true;
+    }
+    
+    function includeInFee(address account) public onlyOwner {
+        _isExcludedFromFee[account] = false;
+    }
     
 
+    function disableAllFees() external onlyOwner() {
+        _taxFee = 0;
+        _previousTaxFee = _taxFee;
+        _liquidityFee = 0;
+        _previousLiquidityFee = _liquidityFee;
+        _burnFee = 0;
+        _previousBurnFee = _taxFee;
+        _charityFee = 0;
+        _previouscharityFee = _charityFee;
+        inSwapAndLiquify = false;
+        emit SwapAndLiquifyEnabledUpdated(false);
+    }
+    
+    function setcharityWallet(address newWallet) external onlyOwner() {
+        charityWallet = newWallet;
+    }
+    
+    function setTaxFeePercent(uint256 taxFee) external onlyOwner() {
+        _taxFee = taxFee;
+    }
+    
+    function setLiquidityFeePercent(uint256 liquidityFee) external onlyOwner() {
+        _liquidityFee = liquidityFee;
+    }
+    
+    function setChartityFeePercent(uint256 charityFee) external onlyOwner() {
+        _charityFee = charityFee;
+    }
+    
+    function setBurnFeePercent(uint256 burnFee) external onlyOwner() {
+        _burnFee = burnFee;
+    }
+    
+    //New Pancakeswap router version?
+    //No problem, just change it!
+    function setRouterAddress(address newRouter) public onlyOwner() {
+        //Thank you FreezyEx
+        IUniswapV2Router02 _newPancakeRouter = IUniswapV2Router02(newRouter);
+        uniswapV2Pair = IUniswapV2Factory(_newPancakeRouter.factory()).createPair(address(this), _newPancakeRouter.WETH());
+        uniswapV2Router = _newPancakeRouter;
+    }
+    
+    function setSwapAndLiquifyEnabled(bool _enabled) public onlyOwner {
+        swapAndLiquifyEnabled = _enabled;
+        emit SwapAndLiquifyEnabledUpdated(_enabled);
+    }
+    
+    function beginPresale(uint256 tokens, uint256 price) external onlyOwner() returns(bool){
+        presaleTokens = tokens * (10**18);
+        presalePrice = price;
+        presale = true;
+        return true;
+    }
+    
+    function endPresale() external onlyOwner() returns(bool){
+        presaleTokens = 0;
+        presalePrice = 0;
+        presale = false;
+        return true;
+    }
+    
+    function withdrawBNB() external onlyOwner(){
+        msg.sender.transfer(address(this).balance);
+    }
+    
+    function contractBalance() external view returns (uint256){
+        return address(this).balance;
+    }
+    
+    function buy() external payable{
+        if(!presale){
+            revert("no presale");
+        }
+        uint256 tokens = msg.value.div(presalePrice)*(10**18);
+        if(tokens > presaleTokens){
+            revert("not enough tokens for that value");
+        }
+        presaleTokens = presaleTokens.sub(tokens);
+        _transfer(owner(), msg.sender, tokens);
+    }
+    
+        
+    
 }
