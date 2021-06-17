@@ -227,6 +227,7 @@ library SafeMath {
      *
      * - The divisor cannot be zero.
      */
+    
     function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b != 0, errorMessage);
         return a % b;
@@ -682,7 +683,7 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 
-contract Seedling is Context, IERC20, Ownable {
+contract StarFish is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
