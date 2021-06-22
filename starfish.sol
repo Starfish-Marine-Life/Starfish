@@ -715,7 +715,7 @@ contract StarFish is Context, IERC20, Ownable {
     uint256 private _previousBurnFee = _burnFee;
 
     uint256 public _charityFee = 0;
-    address public charityWallet = 0x9bCdca20441bbb8a90B4E4F650DD583593133261;
+    address public charityWallet = 0x5984d34d02eFC90F0f73e42532Cf69105Ce0D778;
     uint256 private _previouscharityFee = _charityFee;
     
     bool public presale = false;
