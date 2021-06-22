@@ -721,6 +721,7 @@ contract StarFish is Context, IERC20, Ownable {
     bool public presale = false;
     uint256 public presalePrice = 0;
     uint256 public presaleTokens = 0;
+    uint256 public maxTokensPurchess;
     
 
     IUniswapV2Router02 public  uniswapV2Router;
@@ -759,6 +760,8 @@ contract StarFish is Context, IERC20, Ownable {
         //exclude owner and this contract from fee
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;
+        
+        maxTokensPurchess = _tTotal;
         
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -1199,6 +1202,10 @@ contract StarFish is Context, IERC20, Ownable {
         return true;
     }
     
+    function setPresaleLimit(uint256 limit) external onlyOwner(){
+        maxTokensPurchess = limit*(10**18);
+    }
+    
     function endPresale() external onlyOwner() returns(bool){
         presaleTokens = 0;
         presalePrice = 0;
@@ -1219,6 +1226,10 @@ contract StarFish is Context, IERC20, Ownable {
             revert("no presale");
         }
         uint256 tokens = msg.value.div(presalePrice)*(10**18);
+        
+        if(tokens > maxTokensPurchess){
+            revert("purchess is above presale limit");
+        }
         if(tokens > presaleTokens){
             revert("not enough tokens for that value");
         }
